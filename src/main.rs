@@ -1,23 +1,43 @@
+use std::io;
+
+use std::io::{BufReader, BufRead};
+
+mod solutions;
 
 /// Print program usage to stdout
 fn print_usage() {
     println!("Expected usage:");
     println!("  $> <executable> <day num> <input file>");
-    println!("Where <day> is a value in [1, 25], and"
-             " <input file> is the text file input for the problem");
+}
+
+fn get_file_input(path: &str) -> io::Result<Vec<String>> {
+    let file = std::fs::File::open(path)?;
+    BufReader::new(file).lines().collect()
 }
 
 fn main() {
-    let args = std::env::args().skip(1).collect();
-    if len(args) != 2 {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() != 2 {
         print_usage();
         return;
     }
-    let day = args[0].parse::<u8>()?;
-    let input_file = args[1];
+    let day: u8 = match args[0].parse() {
+        Ok(x) => x,
+        Err(err) => {
+            println!("Error while parsing <day>: {:?}", err);
+            return;
+        },
+    };
+    let input = match get_file_input(&args[1]) {
+        Ok(x) => x,
+        Err(err) => {
+            println!("Error while getting input: {:?}", err);
+            return;
+        },
+    };
 
     match day {
-        1 => unimplemented!(),
+        1 => solutions::day01::work(&input),
         2 => unimplemented!(),
         3 => unimplemented!(),
         4 => unimplemented!(),
