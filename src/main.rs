@@ -3,6 +3,7 @@ use std::io;
 use std::io::{BufReader, BufRead};
 
 mod solutions;
+mod utilities;
 
 /// Print program usage to stdout
 fn print_usage() {
