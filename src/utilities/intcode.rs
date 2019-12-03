@@ -1,24 +1,35 @@
 //! This module implements an IntCode interpreter.
 
+// The following terminology notes are taken from day 2 part 2
+//  - memory: the list of integers used when interpreting
+//  - address/position: the value at a given index into memory
+//  - opcode: mark the beginning of an instruction and denote the instruction
+//  - parameters: the values after an instruction used by the instruction
+//  - instruction pointer: the address of the current instruction
+
+const ADD: usize = 1; // *(pc+1) + *(pc+2) => *(pc+3)
+const MULTIPLY: usize = 2; // *(pc+1) * *(pc+2) => *(pc+3)
+const HALT: usize = 99;
+
 /// Interpret array as an IntCode program.
 ///
 /// `mem` is the initial machine memory state, it is modified during the run
 ///
-/// Will panic if it encounters an unknown OpCode
+/// Will panic if it encounters an unknown opcode
 pub fn interpret(mem: &mut [usize]) -> usize {
-    let mut pc = 0;
-    while mem[pc] != 99 { // Halt
-        match mem[pc] {
-            1 => { // Add
-                mem[mem[pc+3]] = mem[mem[pc+1]] + mem[mem[pc+2]];
-                pc += 4;
+    let mut ip = 0;
+    while mem[ip] != HALT {
+        match mem[ip] {
+            ADD => {
+                mem[mem[ip+3]] = mem[mem[ip+1]] + mem[mem[ip+2]];
+                ip += 4;
             }
-            2 => { // Mul
-                mem[mem[pc+3]] = mem[mem[pc+1]] * mem[mem[pc+2]];
-                pc += 4;
+            MULTIPLY => {
+                mem[mem[ip+3]] = mem[mem[ip+1]] * mem[mem[ip+2]];
+                ip += 4;
             }
             _ => {
-                panic!("Unexpected opcode: {} at {}", mem[pc], pc);
+                panic!("Unexpected opcode: {} at {}", mem[ip], ip);
             }
         }
     }
