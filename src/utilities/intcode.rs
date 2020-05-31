@@ -41,12 +41,38 @@ fn parse_instruction(word: usize) -> (usize, AddrMode, AddrMode, AddrMode) {
     )
 }
 
+/// Trait is used by interpret for reading information interactively
+pub trait Input {
+    fn get_isize(&mut self) -> isize;
+}
+
+/// Trait is used by `interpret` for writing information interactively
+pub trait Output {
+    fn write_isize(&mut self, word: isize) -> ();
+}
+
+// Implementations for Input trait
+
+impl Input for () {
+    fn get_isize(&mut self) -> isize {
+        panic!("Program requested input, but input source was ()");
+    }
+}
+
+// Implementations for Output trait
+
+impl Output for () {
+    fn write_isize(&mut self, word: isize) -> () {
+        panic!("Program attempted to write value, but out was ()");
+    }
+}
+
 /// Interpret array as an IntCode program.
 ///
 /// `mem` is the initial machine memory state, it is modified during the run
 ///
 /// Will panic if it encounters an unknown opcode
-pub fn interpret(mem: &mut [usize]) -> usize {
+pub fn interpret(mem: &mut [usize], input: impl Input, output: impl Output) -> usize {
     let mut ip = 0;
     while mem[ip] != HALT {
         match mem[ip] {
@@ -88,7 +114,7 @@ mod test {
             vec![30, 1, 1, 4, 2, 5, 6, 0, 99],
         ];
         for i in 0..programs.len() {
-            assert_eq!(interpret(&mut programs[i]), outputs[i][0]);
+            assert_eq!(interpret(&mut programs[i], (), ()), outputs[i][0]);
             assert_eq!(programs[i], outputs[i]);
         }
     }

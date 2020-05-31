@@ -13,7 +13,7 @@ fn do_work(lines: &Vec<String>) -> usize {
     // set program up for 1202 program
     program[1] = 12;
     program[2] = 2;
-    interpret(&mut program)
+    interpret(&mut program, (), ())
 }
 
 fn do_work_2(lines: &Vec<String>) -> usize {
@@ -26,7 +26,7 @@ fn do_work_2(lines: &Vec<String>) -> usize {
             let mut tmp_mem = program.clone();
             tmp_mem[1] = i; // noun
             tmp_mem[2] = k; // verb
-            let res = interpret(&mut tmp_mem);
+            let res = interpret(&mut tmp_mem, (), ());
             if res == 19690720 {
                 return i * 100 + k;
             }
