@@ -6,7 +6,10 @@ pub fn work(lines: &Vec<String>) {
 }
 
 fn do_work(lines: &Vec<String>) -> usize {
-    let mut program: Vec<usize> = lines[0].split(',').map(|piece| piece.parse().unwrap()).collect();
+    let mut program: Vec<usize> = lines[0]
+        .split(',')
+        .map(|piece| piece.parse().unwrap())
+        .collect();
     // set program up for 1202 program
     program[1] = 12;
     program[2] = 2;
@@ -14,7 +17,10 @@ fn do_work(lines: &Vec<String>) -> usize {
 }
 
 fn do_work_2(lines: &Vec<String>) -> usize {
-    let program: Vec<usize> = lines[0].split(',').map(|piece| piece.parse().unwrap()).collect();
+    let program: Vec<usize> = lines[0]
+        .split(',')
+        .map(|piece| piece.parse().unwrap())
+        .collect();
     for i in 0..99 {
         for k in 0..99 {
             let mut tmp_mem = program.clone();
@@ -29,7 +35,5 @@ fn do_work_2(lines: &Vec<String>) -> usize {
     panic!("Couldn't find inputs!");
 }
 
-
 #[cfg(test)]
-mod test {
-}
+mod test {}

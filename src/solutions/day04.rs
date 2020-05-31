@@ -47,16 +47,16 @@ fn is_pass_2(pass_num: usize) -> bool {
         return false;
     }
 
-    for i in 0..(pass.len()-1) {
-        if pass[i] != pass[i+1] {
+    for i in 0..(pass.len() - 1) {
+        if pass[i] != pass[i + 1] {
             continue;
         }
         if i > 1 {
-            if pass[i-1] == pass[i] {
+            if pass[i - 1] == pass[i] {
                 continue;
             }
         }
-        if let Some(val) = pass.get(i+2) {
+        if let Some(val) = pass.get(i + 2) {
             if *val == pass[i] {
                 continue;
             }
@@ -65,7 +65,6 @@ fn is_pass_2(pass_num: usize) -> bool {
     }
     return false;
 }
-
 
 #[cfg(test)]
 mod test {

@@ -4,13 +4,15 @@ pub fn work(lines: &Vec<String>) {
 }
 
 fn do_work(lines: &Vec<String>) -> usize {
-    lines.iter()
+    lines
+        .iter()
         .map(|line| mass_to_fuel(line.parse().unwrap()))
         .sum()
 }
 
 fn do_work_2(lines: &Vec<String>) -> usize {
-    lines.iter()
+    lines
+        .iter()
         .map(|line| line.parse::<usize>().unwrap())
         .map(rocket_equation)
         .sum()

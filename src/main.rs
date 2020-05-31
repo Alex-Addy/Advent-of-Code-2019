@@ -1,6 +1,6 @@
 use std::io;
 
-use std::io::{BufReader, BufRead};
+use std::io::{BufRead, BufReader};
 
 mod solutions;
 mod utilities;
@@ -27,14 +27,14 @@ fn main() {
         Err(err) => {
             println!("Error while parsing <day>: {:?}", err);
             return;
-        },
+        }
     };
     let input = match get_file_input(&args[1]) {
         Ok(x) => x,
         Err(err) => {
             println!("Error while getting input: {:?}", err);
             return;
-        },
+        }
     };
 
     match day {
@@ -66,6 +66,6 @@ fn main() {
         _ => {
             print_usage();
             return;
-        },
+        }
     }
 }
