@@ -7,11 +7,29 @@
 //  - parameters: the values after an instruction used by the instruction
 //  - instruction pointer: the address of the current instruction
 
-const ADD: usize = 1; // *(pc+1) + *(pc+2) => *(pc+3)
-const MULTIPLY: usize = 2; // *(pc+1) * *(pc+2) => *(pc+3)
-const READ_IN: usize = 3; // store input to *(pc+1)
-const WRITE_OUT: usize = 4; // print value of *(pc+1) to output
-const HALT: usize = 99;
+#[derive(Debug, PartialEq)]
+enum OpCode {
+    Add = 1,      // *(pc+1) + *(pc+2) => *(pc+3)
+    Multiply = 2, // *(pc+1) * *(pc+2) => *(pc+3)
+    ReadIn = 3,   // store input to *(pc+1)
+    WriteOut = 4, // print value of *(pc+1) to output
+    Halt = 99,
+}
+
+impl From<usize> for OpCode {
+    fn from(num: usize) -> Self {
+        match num {
+            1 => Self::Add,
+            2 => Self::Multiply,
+            3 => Self::ReadIn,
+            4 => Self::WriteOut,
+
+            99 => Self::Halt,
+
+            _ => panic!(format!("Got invalid opcode: {}", num)),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 enum AddrMode {
@@ -59,9 +77,10 @@ impl Input for () {
     }
 }
 
-impl Input for dyn Iterator<Item=isize> {
+impl Input for dyn Iterator<Item = isize> {
     fn get_isize(&mut self) -> isize {
-        self.next().expect("Program requested input, but Iterator return None")
+        self.next()
+            .expect("Program requested input, but Iterator return None")
     }
 }
 
@@ -85,27 +104,29 @@ impl Output for Vec<isize> {
 ///
 /// Will panic if it encounters an unknown opcode
 pub fn interpret(mem: &mut [usize], mut input: impl Input, mut output: impl Output) -> usize {
+    use OpCode::*;
+
     let mut ip = 0;
-    while mem[ip] != HALT {
-        match mem[ip] {
-            ADD => {
+    loop {
+        match OpCode::from(mem[ip]) {
+            Add => {
                 mem[mem[ip + 3]] = mem[mem[ip + 1]] + mem[mem[ip + 2]];
                 ip += 4;
             }
-            MULTIPLY => {
+            Multiply => {
                 mem[mem[ip + 3]] = mem[mem[ip + 1]] * mem[mem[ip + 2]];
                 ip += 4;
             }
-            READ_IN => {
+            ReadIn => {
                 mem[mem[ip + 1]] = input.get_isize() as usize;
                 ip += 2;
             }
-            WRITE_OUT => {
+            WriteOut => {
                 output.write_isize(mem[mem[ip + 1]] as isize);
                 ip += 2;
             }
-            _ => {
-                panic!("Unexpected opcode: {} at {}", mem[ip], ip);
+            Halt => {
+                break;
             }
         }
     }
