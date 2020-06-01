@@ -9,8 +9,8 @@
 
 const ADD: usize = 1; // *(pc+1) + *(pc+2) => *(pc+3)
 const MULTIPLY: usize = 2; // *(pc+1) * *(pc+2) => *(pc+3)
-const SAVE: usize = 3; // store input to *(pc+1)
-const PRINT: usize = 4; // print value of *(pc+1) to output
+const READ_IN: usize = 3; // store input to *(pc+1)
+const WRITE_OUT: usize = 4; // print value of *(pc+1) to output
 const HALT: usize = 99;
 
 #[derive(Debug, PartialEq)]
@@ -48,7 +48,7 @@ pub trait Input {
 
 /// Trait is used by `interpret` for writing information interactively
 pub trait Output {
-    fn write_isize(&mut self, word: isize) -> ();
+    fn write_isize(&mut self, val: isize) -> ();
 }
 
 // Implementations for Input trait
@@ -59,11 +59,23 @@ impl Input for () {
     }
 }
 
+impl Input for dyn Iterator<Item=isize> {
+    fn get_isize(&mut self) -> isize {
+        self.next().expect("Program requested input, but Iterator return None")
+    }
+}
+
 // Implementations for Output trait
 
 impl Output for () {
-    fn write_isize(&mut self, word: isize) -> () {
+    fn write_isize(&mut self, _val: isize) -> () {
         panic!("Program attempted to write value, but out was ()");
+    }
+}
+
+impl Output for Vec<isize> {
+    fn write_isize(&mut self, val: isize) -> () {
+        self.push(val)
     }
 }
 
@@ -72,7 +84,7 @@ impl Output for () {
 /// `mem` is the initial machine memory state, it is modified during the run
 ///
 /// Will panic if it encounters an unknown opcode
-pub fn interpret(mem: &mut [usize], input: impl Input, output: impl Output) -> usize {
+pub fn interpret(mem: &mut [usize], mut input: impl Input, mut output: impl Output) -> usize {
     let mut ip = 0;
     while mem[ip] != HALT {
         match mem[ip] {
@@ -83,6 +95,14 @@ pub fn interpret(mem: &mut [usize], input: impl Input, output: impl Output) -> u
             MULTIPLY => {
                 mem[mem[ip + 3]] = mem[mem[ip + 1]] * mem[mem[ip + 2]];
                 ip += 4;
+            }
+            READ_IN => {
+                mem[mem[ip + 1]] = input.get_isize() as usize;
+                ip += 2;
+            }
+            WRITE_OUT => {
+                output.write_isize(mem[mem[ip + 1]] as isize);
+                ip += 2;
             }
             _ => {
                 panic!("Unexpected opcode: {} at {}", mem[ip], ip);
