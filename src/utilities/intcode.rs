@@ -16,8 +16,8 @@ enum OpCode {
     Halt = 99,
 }
 
-impl From<usize> for OpCode {
-    fn from(num: usize) -> Self {
+impl From<isize> for OpCode {
+    fn from(num: isize) -> Self {
         match num {
             1 => Self::Add,
             2 => Self::Multiply,
@@ -37,8 +37,8 @@ enum AddrMode {
     Imm = 1,
 }
 
-impl From<usize> for AddrMode {
-    fn from(num: usize) -> Self {
+impl From<isize> for AddrMode {
+    fn from(num: isize) -> Self {
         match num {
             0 => Self::Pos,
             1 => Self::Imm,
@@ -49,13 +49,14 @@ impl From<usize> for AddrMode {
 
 /// Parse instruction will take a full instruction, and split it into the original instruction
 /// along with addressing modes for each argument.
-fn parse_instruction(word: usize) -> (usize, AddrMode, AddrMode, AddrMode) {
-    let cmd = word % 100; // first two digits are the instruction
+fn parse_instruction(word: isize) -> (OpCode, AddrMode, AddrMode, AddrMode) {
+    assert!(word > 0);
+
     (
-        cmd,
-        AddrMode::from(word / 100 % 10),
-        AddrMode::from(word / 1000 % 10),
-        AddrMode::from(word / 10000 % 10),
+        OpCode::from(word % 100),          // first two digits are op
+        AddrMode::from(word / 100 % 10),   // 100s place
+        AddrMode::from(word / 1000 % 10),  // 1000s place
+        AddrMode::from(word / 10000 % 10), // 10000s place
     )
 }
 
@@ -103,26 +104,26 @@ impl Output for Vec<isize> {
 /// `mem` is the initial machine memory state, it is modified during the run
 ///
 /// Will panic if it encounters an unknown opcode
-pub fn interpret(mem: &mut [usize], mut input: impl Input, mut output: impl Output) -> usize {
+pub fn interpret(mem: &mut [isize], mut input: impl Input, mut output: impl Output) -> isize {
     use OpCode::*;
 
     let mut ip = 0;
     loop {
         match OpCode::from(mem[ip]) {
             Add => {
-                mem[mem[ip + 3]] = mem[mem[ip + 1]] + mem[mem[ip + 2]];
+                mem[mem[ip + 3] as usize] = mem[mem[ip + 1] as usize] + mem[mem[ip + 2] as usize];
                 ip += 4;
             }
             Multiply => {
-                mem[mem[ip + 3]] = mem[mem[ip + 1]] * mem[mem[ip + 2]];
+                mem[mem[ip + 3] as usize] = mem[mem[ip + 1] as usize] * mem[mem[ip + 2] as usize];
                 ip += 4;
             }
             ReadIn => {
-                mem[mem[ip + 1]] = input.get_isize() as usize;
+                mem[mem[ip + 1] as usize] = input.get_isize();
                 ip += 2;
             }
             WriteOut => {
-                output.write_isize(mem[mem[ip + 1]] as isize);
+                output.write_isize(mem[mem[ip + 1] as usize]);
                 ip += 2;
             }
             Halt => {
@@ -163,20 +164,21 @@ mod test {
     #[test]
     fn test_parse_instruction() {
         use AddrMode::*;
+        use OpCode::*;
 
-        type Output = (usize, AddrMode, AddrMode, AddrMode);
+        type Output = (OpCode, AddrMode, AddrMode, AddrMode);
         fn eq(left: Output, right: Output) -> bool {
             left.0 == right.0 && left.1 == right.1 && left.2 == right.2 && left.3 == right.3
         }
 
         // from day 5 examples
-        assert!(eq(parse_instruction(1002), (2, Pos, Imm, Pos)));
+        assert!(eq(parse_instruction(1002), (Multiply, Pos, Imm, Pos)));
 
         // synthetic
-        assert!(eq(parse_instruction(2), (2, Pos, Pos, Pos)));
-        assert!(eq(parse_instruction(11104), (4, Imm, Imm, Imm)));
-        assert!(eq(parse_instruction(10113), (13, Imm, Pos, Imm)));
-        assert!(eq(parse_instruction(104), (4, Imm, Pos, Pos)));
-        assert!(eq(parse_instruction(10004), (4, Pos, Pos, Imm)));
+        assert!(eq(parse_instruction(2), (Multiply, Pos, Pos, Pos)));
+        assert!(eq(parse_instruction(11101), (Add, Imm, Imm, Imm)));
+        assert!(eq(parse_instruction(10101), (Add, Imm, Pos, Imm)));
+        assert!(eq(parse_instruction(104), (WriteOut, Imm, Pos, Pos)));
+        assert!(eq(parse_instruction(10003), (ReadIn, Pos, Pos, Imm)));
     }
 }

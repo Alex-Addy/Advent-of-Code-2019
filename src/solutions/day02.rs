@@ -5,8 +5,8 @@ pub fn work(lines: &Vec<String>) {
     println!("Part 2: {}", do_work_2(&lines));
 }
 
-fn do_work(lines: &Vec<String>) -> usize {
-    let mut program: Vec<usize> = lines[0]
+fn do_work(lines: &Vec<String>) -> isize {
+    let mut program: Vec<isize> = lines[0]
         .split(',')
         .map(|piece| piece.parse().unwrap())
         .collect();
@@ -16,8 +16,8 @@ fn do_work(lines: &Vec<String>) -> usize {
     interpret(&mut program, (), ())
 }
 
-fn do_work_2(lines: &Vec<String>) -> usize {
-    let program: Vec<usize> = lines[0]
+fn do_work_2(lines: &Vec<String>) -> isize {
+    let program: Vec<isize> = lines[0]
         .split(',')
         .map(|piece| piece.parse().unwrap())
         .collect();
