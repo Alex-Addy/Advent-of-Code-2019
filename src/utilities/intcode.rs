@@ -1,5 +1,7 @@
 //! This module implements an IntCode interpreter.
 
+use std::convert::TryFrom;
+
 // The following terminology notes are taken from day 2 part 2
 //  - memory: the list of integers used when interpreting
 //  - address/position: the value at a given index into memory
@@ -16,17 +18,19 @@ enum OpCode {
     Halt = 99,
 }
 
-impl From<isize> for OpCode {
-    fn from(num: isize) -> Self {
+impl TryFrom<isize> for OpCode {
+    type Error = &'static str;
+
+    fn try_from(num: isize) -> Result<Self, Self::Error> {
         match num {
-            1 => Self::Add,
-            2 => Self::Multiply,
-            3 => Self::ReadIn,
-            4 => Self::WriteOut,
+            1 => Ok(Self::Add),
+            2 => Ok(Self::Multiply),
+            3 => Ok(Self::ReadIn),
+            4 => Ok(Self::WriteOut),
 
-            99 => Self::Halt,
+            99 => Ok(Self::Halt),
 
-            _ => panic!(format!("Got invalid opcode: {}", num)),
+            _ => Err("invalid opcode value"),
         }
     }
 }
@@ -37,27 +41,31 @@ enum AddrMode {
     Imm = 1,
 }
 
-impl From<isize> for AddrMode {
-    fn from(num: isize) -> Self {
+impl TryFrom<isize> for AddrMode {
+    type Error = &'static str;
+
+    fn try_from(num: isize) -> Result<Self, Self::Error> {
         match num {
-            0 => Self::Pos,
-            1 => Self::Imm,
-            _ => panic!(format!("Got invalid address mode value {}", num)),
+            0 => Ok(Self::Pos),
+            1 => Ok(Self::Imm),
+            _ => Err("invalid address mode value"),
         }
     }
 }
 
 /// Parse instruction will take a full instruction, and split it into the original instruction
 /// along with addressing modes for each argument.
-fn parse_instruction(word: isize) -> (OpCode, AddrMode, AddrMode, AddrMode) {
-    assert!(word > 0);
+fn parse_instruction(word: isize) -> Result<(OpCode, AddrMode, AddrMode, AddrMode), &'static str> {
+    if word <= 0 {
+        return Err("instruction word must be greater than zero")
+    }
 
-    (
-        OpCode::from(word % 100),          // first two digits are op
-        AddrMode::from(word / 100 % 10),   // 100s place
-        AddrMode::from(word / 1000 % 10),  // 1000s place
-        AddrMode::from(word / 10000 % 10), // 10000s place
-    )
+    Ok((
+        OpCode::try_from(word % 100)?,          // first two digits are op
+        AddrMode::try_from(word / 100 % 10)?,   // 100s place
+        AddrMode::try_from(word / 1000 % 10)?,  // 1000s place
+        AddrMode::try_from(word / 10000 % 10)?, // 10000s place
+    ))
 }
 
 /// Trait is used by interpret for reading information interactively
@@ -106,16 +114,41 @@ impl Output for Vec<isize> {
 /// Will panic if it encounters an unknown opcode
 pub fn interpret(mem: &mut [isize], mut input: impl Input, mut output: impl Output) -> isize {
     use OpCode::*;
+    use AddrMode::*;
 
     let mut ip = 0;
     loop {
-        match OpCode::from(mem[ip]) {
+        let (op, addr1, addr2, addr3) = match parse_instruction(mem[ip]) {
+            Ok(val) => val,
+            Err(err) => {
+                println!("State:\n\tIP: {}\n\tVals: {:?}, {:?}, {:?}, {:?}", ip, mem.get(ip), mem.get(ip+1), mem.get(ip+2), mem.get(ip+3));
+                panic!(format!("Encountered unrecoverable error: {}", err));
+            }
+        };
+        // placing Halt check here so that args can be extracted without duplicating their code all
+        // over the place
+        println!("IP: {}, INSTR: {:?}, {:?}, {:?}, {:?}", ip, op, addr1, addr2, addr3);
+        if op == Halt {
+            break;
+        }
+
+        let arg1 = match addr1 {
+            Imm => mem[ip+1],
+            Pos => mem[mem[ip+1] as usize],
+        };
+        let arg2 = match addr2 {
+            Imm => mem[ip+2],
+            Pos => mem[mem[ip+2] as usize],
+        };
+
+        match op {
             Add => {
-                mem[mem[ip + 3] as usize] = mem[mem[ip + 1] as usize] + mem[mem[ip + 2] as usize];
+                println!("ADD {} + {} => {}", arg1, arg2, mem[ip + 3]);
+                mem[mem[ip + 3] as usize] = arg1 + arg2;
                 ip += 4;
             }
             Multiply => {
-                mem[mem[ip + 3] as usize] = mem[mem[ip + 1] as usize] * mem[mem[ip + 2] as usize];
+                mem[mem[ip + 3] as usize] = arg1 * arg2;
                 ip += 4;
             }
             ReadIn => {
@@ -123,12 +156,10 @@ pub fn interpret(mem: &mut [isize], mut input: impl Input, mut output: impl Outp
                 ip += 2;
             }
             WriteOut => {
-                output.write_isize(mem[mem[ip + 1] as usize]);
+                output.write_isize(arg1);
                 ip += 2;
             }
-            Halt => {
-                break;
-            }
+            Halt => unreachable!(),
         }
     }
 
@@ -172,13 +203,22 @@ mod test {
         }
 
         // from day 5 examples
-        assert!(eq(parse_instruction(1002), (Multiply, Pos, Imm, Pos)));
+        assert!(eq(parse_instruction(1002).unwrap(), (Multiply, Pos, Imm, Pos)));
 
         // synthetic
-        assert!(eq(parse_instruction(2), (Multiply, Pos, Pos, Pos)));
-        assert!(eq(parse_instruction(11101), (Add, Imm, Imm, Imm)));
-        assert!(eq(parse_instruction(10101), (Add, Imm, Pos, Imm)));
-        assert!(eq(parse_instruction(104), (WriteOut, Imm, Pos, Pos)));
-        assert!(eq(parse_instruction(10003), (ReadIn, Pos, Pos, Imm)));
+        assert!(eq(parse_instruction(2).unwrap(), (Multiply, Pos, Pos, Pos)));
+        assert!(eq(parse_instruction(11101).unwrap(), (Add, Imm, Imm, Imm)));
+        assert!(eq(parse_instruction(10101).unwrap(), (Add, Imm, Pos, Imm)));
+        assert!(eq(parse_instruction(104).unwrap(), (WriteOut, Imm, Pos, Pos)));
+        assert!(eq(parse_instruction(10003).unwrap(), (ReadIn, Pos, Pos, Imm)));
+    }
+
+    #[test]
+    fn day5_snippets() {
+        // This tests immediate and positional addressing and negative immediate support
+        // Should: find (100 + -1), store result @4
+        let mut simple_prog = vec![1101,100,-1,4,0];
+        interpret(&mut simple_prog, (), ());
+        assert_eq!(simple_prog[4], 99);
     }
 }
