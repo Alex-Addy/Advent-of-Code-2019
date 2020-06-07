@@ -42,7 +42,7 @@ fn main() {
         2 => solutions::day02::work(&input),
         3 => solutions::day03::work(&input),
         4 => solutions::day04::work(&input),
-        5 => unimplemented!(),
+        5 => solutions::day05::work(&input),
         6 => unimplemented!(),
         7 => unimplemented!(),
         8 => unimplemented!(),
