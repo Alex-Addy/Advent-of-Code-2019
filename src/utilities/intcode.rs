@@ -86,10 +86,9 @@ impl Input for () {
     }
 }
 
-impl Input for dyn Iterator<Item = isize> {
+impl Input for isize {
     fn get_isize(&mut self) -> isize {
-        self.next()
-            .expect("Program requested input, but Iterator return None")
+        *self
     }
 }
 
@@ -101,7 +100,7 @@ impl Output for () {
     }
 }
 
-impl Output for Vec<isize> {
+impl Output for &mut Vec<isize> {
     fn write_isize(&mut self, val: isize) -> () {
         self.push(val)
     }
@@ -127,27 +126,33 @@ pub fn interpret(mem: &mut [isize], mut input: impl Input, mut output: impl Outp
         };
         // placing Halt check here so that args can be extracted without duplicating their code all
         // over the place
-        println!("IP: {}, INSTR: {:?}, {:?}, {:?}, {:?}", ip, op, addr1, addr2, addr3);
+        //println!("IP: {}, INSTR: {:?}, {:?}, {:?}, {:?}", ip, op, addr1, addr2, addr3);
         if op == Halt {
             break;
         }
 
-        let arg1 = match addr1 {
-            Imm => mem[ip+1],
-            Pos => mem[mem[ip+1] as usize],
-        };
-        let arg2 = match addr2 {
-            Imm => mem[ip+2],
-            Pos => mem[mem[ip+2] as usize],
-        };
-
         match op {
             Add => {
-                println!("ADD {} + {} => {}", arg1, arg2, mem[ip + 3]);
+                let arg1 = match addr1 {
+                    Imm => mem[ip+1],
+                    Pos => mem[mem[ip+1] as usize],
+                };
+                let arg2 = match addr2 {
+                    Imm => mem[ip+2],
+                    Pos => mem[mem[ip+2] as usize],
+                };
                 mem[mem[ip + 3] as usize] = arg1 + arg2;
                 ip += 4;
             }
             Multiply => {
+                let arg1 = match addr1 {
+                    Imm => mem[ip+1],
+                    Pos => mem[mem[ip+1] as usize],
+                };
+                let arg2 = match addr2 {
+                    Imm => mem[ip+2],
+                    Pos => mem[mem[ip+2] as usize],
+                };
                 mem[mem[ip + 3] as usize] = arg1 * arg2;
                 ip += 4;
             }
@@ -156,7 +161,7 @@ pub fn interpret(mem: &mut [isize], mut input: impl Input, mut output: impl Outp
                 ip += 2;
             }
             WriteOut => {
-                output.write_isize(arg1);
+                output.write_isize(mem[mem[ip + 1] as usize]);
                 ip += 2;
             }
             Halt => unreachable!(),
@@ -220,5 +225,15 @@ mod test {
         let mut simple_prog = vec![1101,100,-1,4,0];
         interpret(&mut simple_prog, (), ());
         assert_eq!(simple_prog[4], 99);
+
+        // This should save whatever it gets from input to @0, then print it back out
+        let arb_input = 10346;
+        let mut output = Vec::new();
+        let mut simple_io = vec![3,0,4,0,99];
+        interpret(&mut simple_io, arb_input, &mut output);
+        println!("{:?}", output[0]);
+        println!("{:?}", simple_io);
+        assert_eq!(simple_io[0], arb_input);
+        assert_eq!(output[0], arb_input);
     }
 }
