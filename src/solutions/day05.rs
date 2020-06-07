@@ -6,6 +6,7 @@ pub fn work(lines: &Vec<String>) {
 
 fn do_work(line: &str) -> Vec<isize> {
     let mut program: Vec<isize> = line
+        .trim()
         .split(',')
         .map(|piece| piece.parse().unwrap())
         .collect();
@@ -17,8 +18,11 @@ fn do_work(line: &str) -> Vec<isize> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
     fn part_1_test() {
         let input = include_str!("../../inputs/day05.txt");
+        println!("{:?}", input);
         let exp_out = vec![3, 0, 0, 0, 0, 0, 0, 0, 0, 8332629];
         let output = do_work(input);
         assert_eq!(output, exp_out);

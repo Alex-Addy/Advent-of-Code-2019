@@ -53,6 +53,13 @@ impl TryFrom<isize> for AddrMode {
     }
 }
 
+#[derive(Debug)]
+enum IPChange {
+    Delta(isize),
+    New(usize),
+    Halt,
+}
+
 /// Parse instruction will take a full instruction, and split it into the original instruction
 /// along with addressing modes for each argument.
 fn parse_instruction(word: isize) -> Result<(OpCode, AddrMode, AddrMode, AddrMode), &'static str> {
@@ -111,71 +118,84 @@ impl Output for &mut Vec<isize> {
 /// `mem` is the initial machine memory state, it is modified during the run
 ///
 /// Will panic if it encounters an unknown opcode
-pub fn interpret(mem: &mut [isize], mut input: impl Input, mut output: impl Output) -> isize {
-    use AddrMode::*;
-    use OpCode::*;
-
-    let mut ip = 0;
+pub fn interpret(mut mem: &mut [isize], mut input: impl Input, mut output: impl Output) -> isize {
+    let mut ip: usize = 0;
     loop {
-        let (op, addr1, addr2, addr3) = match parse_instruction(mem[ip]) {
-            Ok(val) => val,
-            Err(err) => {
-                println!(
-                    "State:\n\tIP: {}\n\tVals: {:?}, {:?}, {:?}, {:?}",
-                    ip,
-                    mem.get(ip),
-                    mem.get(ip + 1),
-                    mem.get(ip + 2),
-                    mem.get(ip + 3)
-                );
-                panic!(format!("Encountered unrecoverable error: {}", err));
-            }
-        };
-        // placing Halt check here so that args can be extracted without duplicating their code all
-        // over the place
-        //println!("IP: {}, INSTR: {:?}, {:?}, {:?}, {:?}", ip, op, addr1, addr2, addr3);
-        if op == Halt {
-            break;
-        }
-
-        match op {
-            Add => {
-                let arg1 = match addr1 {
-                    Imm => mem[ip + 1],
-                    Pos => mem[mem[ip + 1] as usize],
-                };
-                let arg2 = match addr2 {
-                    Imm => mem[ip + 2],
-                    Pos => mem[mem[ip + 2] as usize],
-                };
-                mem[mem[ip + 3] as usize] = arg1 + arg2;
-                ip += 4;
-            }
-            Multiply => {
-                let arg1 = match addr1 {
-                    Imm => mem[ip + 1],
-                    Pos => mem[mem[ip + 1] as usize],
-                };
-                let arg2 = match addr2 {
-                    Imm => mem[ip + 2],
-                    Pos => mem[mem[ip + 2] as usize],
-                };
-                mem[mem[ip + 3] as usize] = arg1 * arg2;
-                ip += 4;
-            }
-            ReadIn => {
-                mem[mem[ip + 1] as usize] = input.get_isize();
-                ip += 2;
-            }
-            WriteOut => {
-                output.write_isize(mem[mem[ip + 1] as usize]);
-                ip += 2;
-            }
-            Halt => unreachable!(),
+        match step(&mut mem, ip, &mut input, &mut output) {
+            IPChange::Delta(delta) => ip = (ip as isize + delta) as usize,
+            IPChange::New(new) => ip = new,
+            IPChange::Halt => break,
         }
     }
 
     mem[0]
+}
+
+fn step(
+    mem: &mut [isize],
+    ip: usize,
+    input: &mut impl Input,
+    output: &mut impl Output,
+) -> IPChange {
+    use AddrMode::*;
+    use OpCode::*;
+
+    let (op, addr1, addr2, addr3) = match parse_instruction(mem[ip]) {
+        Ok(val) => val,
+        Err(err) => {
+            println!(
+                "State:\n\tIP: {}\n\tVals: {:?}, {:?}, {:?}, {:?}",
+                ip,
+                mem.get(ip),
+                mem.get(ip + 1),
+                mem.get(ip + 2),
+                mem.get(ip + 3)
+            );
+            panic!(format!("Encountered unrecoverable error: {}", err));
+        }
+    };
+    // placing Halt check here so that args can be extracted without duplicating their code all
+    // over the place
+    if op == Halt {
+        return IPChange::Halt;
+    }
+
+    let delta = match op {
+        Add => {
+            let arg1 = match addr1 {
+                Imm => mem[ip + 1],
+                Pos => mem[mem[ip + 1] as usize],
+            };
+            let arg2 = match addr2 {
+                Imm => mem[ip + 2],
+                Pos => mem[mem[ip + 2] as usize],
+            };
+            mem[mem[ip + 3] as usize] = arg1 + arg2;
+            4
+        }
+        Multiply => {
+            let arg1 = match addr1 {
+                Imm => mem[ip + 1],
+                Pos => mem[mem[ip + 1] as usize],
+            };
+            let arg2 = match addr2 {
+                Imm => mem[ip + 2],
+                Pos => mem[mem[ip + 2] as usize],
+            };
+            mem[mem[ip + 3] as usize] = arg1 * arg2;
+            4
+        }
+        ReadIn => {
+            mem[mem[ip + 1] as usize] = input.get_isize();
+            2
+        }
+        WriteOut => {
+            output.write_isize(mem[mem[ip + 1] as usize]);
+            2
+        }
+        Halt => unreachable!(),
+    };
+    return IPChange::Delta(delta);
 }
 
 #[cfg(test)]
