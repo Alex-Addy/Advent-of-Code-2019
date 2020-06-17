@@ -11,10 +11,14 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 enum OpCode {
-    Add = 1,      // *(pc+1) + *(pc+2) => *(pc+3)
-    Multiply = 2, // *(pc+1) * *(pc+2) => *(pc+3)
-    ReadIn = 3,   // store input to *(pc+1)
-    WriteOut = 4, // print value of *(pc+1) to output
+    Add = 1,        // *(pc+1) + *(pc+2) => *(pc+3)
+    Multiply = 2,   // *(pc+1) * *(pc+2) => *(pc+3)
+    ReadIn = 3,     // store input to *(pc+1)
+    WriteOut = 4,   // print value of *(pc+1) to output
+    JmpIfTrue = 5,  // jump if *(pc+1) != 0 => ip = *(pc+2)
+    JmpIfFalse = 6, // jump if *(pc+1) == 0 => ip = *(pc+2)
+    LessThan = 7,   // if *(pc+1) < *(pc+2) => *(pc+3) = 1, else 0
+    Equals = 8,     // if *(pc+1) == *(pc+2) => *(pc+3) = 1, else 0
     Halt = 99,
 }
 
@@ -27,6 +31,10 @@ impl TryFrom<isize> for OpCode {
             2 => Ok(Self::Multiply),
             3 => Ok(Self::ReadIn),
             4 => Ok(Self::WriteOut),
+            5 => Ok(Self::JmpIfTrue),
+            6 => Ok(Self::JmpIfFalse),
+            7 => Ok(Self::LessThan),
+            8 => Ok(Self::Equals),
 
             99 => Ok(Self::Halt),
 
@@ -160,42 +168,60 @@ fn step(
         return IPChange::Halt;
     }
 
-    let delta = match op {
+    // HACK: this whole block is a hack, need to wrap memory up in a new type and provide accessors
+    // that understand addressing modes
+    let arg1 = match addr1 {
+        Imm => mem.get(ip + 1),
+        Pos => mem.get(*mem.get(ip + 1).unwrap_or(&0) as usize),
+    }
+    .unwrap_or(&-1337);
+    let arg2 = match addr2 {
+        Imm => mem.get(ip + 2),
+        Pos => mem.get(*mem.get(ip + 2).unwrap_or(&0) as usize),
+    }
+    .unwrap_or(&-1337);
+
+    match op {
         Add => {
-            let arg1 = match addr1 {
-                Imm => mem[ip + 1],
-                Pos => mem[mem[ip + 1] as usize],
-            };
-            let arg2 = match addr2 {
-                Imm => mem[ip + 2],
-                Pos => mem[mem[ip + 2] as usize],
-            };
             mem[mem[ip + 3] as usize] = arg1 + arg2;
-            4
+            IPChange::Delta(4)
         }
         Multiply => {
-            let arg1 = match addr1 {
-                Imm => mem[ip + 1],
-                Pos => mem[mem[ip + 1] as usize],
-            };
-            let arg2 = match addr2 {
-                Imm => mem[ip + 2],
-                Pos => mem[mem[ip + 2] as usize],
-            };
             mem[mem[ip + 3] as usize] = arg1 * arg2;
-            4
+            IPChange::Delta(4)
         }
         ReadIn => {
             mem[mem[ip + 1] as usize] = input.get_isize();
-            2
+            IPChange::Delta(2)
         }
         WriteOut => {
             output.write_isize(mem[mem[ip + 1] as usize]);
-            2
+            IPChange::Delta(2)
+        }
+        JmpIfTrue => {
+            if *arg1 != 0 {
+                IPChange::New(usize::try_from(*arg2).unwrap())
+            } else {
+                IPChange::Delta(3)
+            }
+        }
+        JmpIfFalse => {
+            if *arg1 == 0 {
+                IPChange::New(usize::try_from(*arg2).unwrap())
+            } else {
+                IPChange::Delta(3)
+            }
+        }
+        LessThan => {
+            mem[mem[ip + 3] as usize] = if arg1 < arg2 { 1 } else { 0 };
+            IPChange::Delta(4)
+        }
+        Equals => {
+            mem[mem[ip + 3] as usize] = if arg1 == arg2 { 1 } else { 0 };
+            IPChange::Delta(4)
         }
         Halt => unreachable!(),
-    };
-    return IPChange::Delta(delta);
+    }
 }
 
 #[cfg(test)]
@@ -271,5 +297,75 @@ mod test {
         println!("{:?}", simple_io);
         assert_eq!(simple_io[0], arb_input);
         assert_eq!(output[0], arb_input);
+    }
+
+    #[test]
+    fn day5_jump_tests() {
+        // These programs compare the input to 8, outputting 1 if eq or lt, 0 otherwise
+        // they use different methods for each
+        // test eq
+        let progs_eq_to_eight = vec![
+            vec![3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8], // positional
+            vec![3, 3, 1108, -1, 8, 3, 4, 3, 99],     // immediate
+        ];
+        for (input, exp_out) in vec![(0, 0), (8, 1), (-8, 0), (10, 0)] {
+            for i in 0..progs_eq_to_eight.len() {
+                let mut prog = progs_eq_to_eight[i].clone();
+                let mut output = Vec::new();
+                interpret(&mut prog, input, &mut output);
+                assert_eq!(exp_out, output[0]);
+            }
+        }
+        // test lt
+        let progs_lt_eight = vec![
+            vec![3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8], // lt positional
+            vec![3, 3, 1107, -1, 8, 3, 4, 3, 99],     // lt immediate
+        ];
+        for (input, exp_out) in vec![(0, 1), (-1, 1), (8, 0), (10, 0)] {
+            for i in 0..progs_lt_eight.len() {
+                let mut prog = progs_lt_eight[i].clone();
+                let mut output = Vec::new();
+                interpret(&mut prog, input, &mut output);
+                assert_eq!(exp_out, output[0], "input: {}", input);
+            }
+        }
+        // test jump
+        let jump_progs = vec![
+            vec![3, 12, 6, 12, 15, 1, 13, 14, 13, 4, 13, 99, -1, 0, 1, 9], // positional
+            vec![3, 3, 1105, -1, 9, 1101, 0, 0, 12, 4, 12, 99, 1],         // immediate
+        ];
+        for (input, exp_out) in vec![(0, 0), (-1, 1), (8, 1), (10, 1)] {
+            for i in 0..jump_progs.len() {
+                let mut prog = jump_progs[i].clone();
+                let mut output = Vec::new();
+                interpret(&mut prog, input, &mut output);
+                assert_eq!(exp_out, output[0], "input: {}", input);
+            }
+        }
+    }
+
+    #[test]
+    fn day5_large_test() {
+        let jmp_prog = vec![
+            3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36, 98, 0,
+            0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000, 1, 20, 4,
+            20, 1105, 1, 46, 98, 99,
+        ];
+        let in_outs = vec![
+            (-1, 999),
+            (0, 999),
+            (5, 999),
+            (8, 1000),
+            (9, 1001),
+            (14240, 1001),
+        ];
+        let mut output = Vec::new();
+        for (input, exp_out) in in_outs.into_iter() {
+            println!("{:?}", input);
+            let mut prog = jmp_prog.clone();
+            output.clear();
+            interpret(&mut prog, input, &mut output);
+            assert_eq!(exp_out, output[0], "input: {}", input);
+        }
     }
 }
